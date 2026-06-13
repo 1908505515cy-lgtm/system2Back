@@ -1,5 +1,7 @@
 package com.example.entity;
 
+import com.baomidou.mybatisplus.annotation.*;
+import com.example.common.annotations.FieldMeta;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,7 +12,6 @@ import java.time.LocalDateTime;
 /**
  * 基础账号实体类（Account）
  * 作为所有客户、管理员、教练等账号的公共基类
- * 采用单表继承策略，方便 AI 导购统一识别账号信息
  */
 @Data
 @SuperBuilder
@@ -18,221 +19,60 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class Account {
 
-    /** 账号ID */
+    @TableId(type = IdType.AUTO)
+    @FieldMeta(label = "ID", showInTable = false, showInForm = false)
     private Long id;
 
-    /** 账号编码（全局唯一） */
+    @FieldMeta(label = "账号编码", searchable = true)
     private String accountCode;
 
-    /** 登录用户名 */
+    @FieldMeta(label = "登录用户名", searchable = true)
     private String username;
 
-    /** 密码（BCrypt加密） */
+    @FieldMeta(label = "密码", type = "password", showInTable = false)
     private String password;
 
-    /** 真实姓名 */
+    @FieldMeta(label = "真实姓名", searchable = true)
     private String realName;
 
-    /** 头像URL */
+    @FieldMeta(label = "头像", type = "text")
     private String avatar;
 
-    /** 性别：0-未知 1-男 2-女 */
+    @FieldMeta(label = "性别", type = "select")
     private Integer gender;
 
-    /** 手机号 */
+    @FieldMeta(label = "手机号", searchable = true)
     private String mobile;
 
-    /** 邮箱 */
+    @FieldMeta(label = "邮箱")
     private String email;
 
-    /** 状态：0-禁用 1-正常 */
+    @FieldMeta(label = "状态", type = "switch")
     private Integer status;
 
-    /** 最后登录时间 */
+    @FieldMeta(label = "最后登录时间", type = "date", showInForm = false)
     private LocalDateTime lastLoginTime;
 
-    /** 最后登录IP */
+    @FieldMeta(label = "最后登录IP", showInForm = false)
     private String lastLoginIp;
 
-    /** 登录次数 */
+    @FieldMeta(label = "登录次数", showInForm = false)
     private Integer loginCount;
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getAccountCode() {
-        return accountCode;
-    }
-
-    public void setAccountCode(String accountCode) {
-        this.accountCode = accountCode;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getRealName() {
-        return realName;
-    }
-
-    public void setRealName(String realName) {
-        this.realName = realName;
-    }
-
-    public String getAvatar() {
-        return avatar;
-    }
-
-    public void setAvatar(String avatar) {
-        this.avatar = avatar;
-    }
-
-    public Integer getGender() {
-        return gender;
-    }
-
-    public void setGender(Integer gender) {
-        this.gender = gender;
-    }
-
-    public String getMobile() {
-        return mobile;
-    }
-
-    public void setMobile(String mobile) {
-        this.mobile = mobile;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public Integer getStatus() {
-        return status;
-    }
-
-    public void setStatus(Integer status) {
-        this.status = status;
-    }
-
-    public LocalDateTime getLastLoginTime() {
-        return lastLoginTime;
-    }
-
-    public void setLastLoginTime(LocalDateTime lastLoginTime) {
-        this.lastLoginTime = lastLoginTime;
-    }
-
-    public String getLastLoginIp() {
-        return lastLoginIp;
-    }
-
-    public void setLastLoginIp(String lastLoginIp) {
-        this.lastLoginIp = lastLoginIp;
-    }
-
-    public Integer getLoginCount() {
-        return loginCount;
-    }
-
-    public void setLoginCount(Integer loginCount) {
-        this.loginCount = loginCount;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
-
-    public String getRemark() {
-        return remark;
-    }
-
-    public void setRemark(String remark) {
-        this.remark = remark;
-    }
-
-    public LocalDateTime getCreateTime() {
-        return createTime;
-    }
-
-    public void setCreateTime(LocalDateTime createTime) {
-        this.createTime = createTime;
-    }
-
-    public LocalDateTime getUpdateTime() {
-        return updateTime;
-    }
-
-    public void setUpdateTime(LocalDateTime updateTime) {
-        this.updateTime = updateTime;
-    }
-
-    public Integer getDeleted() {
-        return deleted;
-    }
-
-    public void setDeleted(Integer deleted) {
-        this.deleted = deleted;
-    }
-
-    public String getNewPassword() {
-        return newPassword;
-    }
-
-    public void setNewPassword(String newPassword) {
-        this.newPassword = newPassword;
-    }
-
-    public String getToken() {
-        return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
-    }
-
-    /** 账号类型：1-管理员 2-普通客户 3-健身教练 */
+    @FieldMeta(label = "账号类型", type = "select")
     private String role;
 
-    /** 备注 */
+    @FieldMeta(label = "备注", type = "textarea")
     private String remark;
 
-    /** 创建时间 */
+    @FieldMeta(label = "创建时间", type = "date", showInForm = false)
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
-    /** 更新时间 */
+    @FieldMeta(label = "更新时间", type = "date", showInForm = false)
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
-    /** 逻辑删除：0-未删除 1-已删除 */
+    @TableLogic
     private Integer deleted;
-
-    private String newPassword;
-
-    private String token;
 }

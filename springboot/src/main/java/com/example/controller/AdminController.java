@@ -1,64 +1,84 @@
-// src/main/java/com/example/controller/AdminController.java
 package com.example.controller;
 
+import com.alibaba.fastjson2.JSONObject;
+import com.example.common.GenericController;
+import com.example.common.Result;
 import com.example.dto.AdminDto;
+import com.example.entity.Admin;
 import com.example.service.AdminService;
 import com.example.vo.AdminVo;
-import com.example.common.PageResult;
-import com.example.common.Result;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 /**
- * 系统管理员 Controller
+ * 管理员 Controller
+ * 继承泛型基类获得标准 CRUD，只保留 Admin 特有端点
  */
 @RestController
 @RequestMapping("/admin")
-public class AdminController {
+public class AdminController extends GenericController<Admin, AdminDto, AdminVo> {
 
     private final AdminService adminService;
+
+    @Value("${ai.callback.secret}")
+    private String aiCallbackSecret;
 
     public AdminController(AdminService adminService) {
         this.adminService = adminService;
     }
 
-    @PostMapping("/add")
-    public Result add(@RequestBody AdminDto dto) {
-        adminService.add(dto);
-        return Result.success("新增成功");
+    @Override
+    protected AdminService getService() {
+        return adminService;
     }
 
-    @PutMapping("/update")
-    public Result update(@RequestBody AdminDto dto) {
-        adminService.update(dto);
-        return Result.success("更新成功");
+    // ==================== Admin 特有端点 ====================
+
+    /**
+     * AI 改名确认执行
+     */
+    @PostMapping("/ai-confirm")
+    public Result confirmAiAction(@RequestBody AdminDto dto) {
+        boolean success = adminService.updateAdminNameFromAi(dto);
+        if (success) {
+            return Result.success("确认执行成功，已将 " + dto.getAdminCode() + " 的登录名修改为 " + dto.getNewName());
+        } else {
+            return Result.error("执行失败，未影响任何行。请确认 adminCode 是否存在。");
+        }
     }
 
-    @DeleteMapping("/delete/{id}")
-    public Result delete(@PathVariable Long id) {
-        adminService.delete(id);
-        return Result.success("删除成功");
+    /**
+     * Python 回调端点（排除在登录拦截器之外，需 API Key 认证）
+     */
+    @PutMapping("/ai-update-name")
+    public JSONObject updateNameFromAgent(@RequestBody AdminDto dto, HttpServletRequest request) {
+        JSONObject response = new JSONObject();
+        // 校验 API Key
+        String apiKey = request.getHeader("X-API-Key");
+        if (aiCallbackSecret == null || !aiCallbackSecret.equals(apiKey)) {
+            response.put("code", 401);
+            response.put("msg", "API Key 无效");
+            return response;
+        }
+        boolean success = adminService.updateAdminNameFromAi(dto);
+        if (success) {
+            response.put("code", 200);
+            response.put("msg", "数据库已同步变更成功");
+        } else {
+            response.put("code", 500);
+            response.put("msg", "未影响任何行，请确认 adminCode 是否存在");
+        }
+        return response;
     }
 
-    @GetMapping("/get/{id}")
-    public Result getById(@PathVariable Long id) {
-        AdminVo vo = adminService.getById(id);
-        return Result.success(vo);
-    }
-
-    @GetMapping("/page")
-    public Result pageList(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Integer status,
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize) {
-
-        PageResult<AdminVo> page = adminService.pageList(keyword, status, pageNum, pageSize);
-        return Result.success(page);
-    }
-
-    @PutMapping("/status")
-    public Result updateStatus(@RequestParam Long id, @RequestParam Integer status) {
-        adminService.updateStatus(id, status);
-        return Result.success("状态修改成功");
+    /**
+     * 重置密码
+     */
+    @PutMapping("/reset-password")
+    public Result resetPassword(@RequestParam Long id) {
+        adminService.resetPassword(id);
+        return Result.success("密码已重置");
     }
 }

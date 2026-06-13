@@ -55,4 +55,10 @@ public class AdminDto {
 
     /** 备注 */
     private String remark;
+
+    private String newName;
+
+    private String industry_keyword; // 产业上下文关键词
+
+    private String rawText;         // 前端管理员输入的原始自然语言指令
 }

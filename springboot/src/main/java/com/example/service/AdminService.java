@@ -1,24 +1,19 @@
-// src/main/java/com/example/service/AdminService.java
 package com.example.service;
 
+import com.example.common.GenericService;
 import com.example.dto.AdminDto;
+import com.example.entity.Admin;
 import com.example.vo.AdminVo;
-import com.example.common.PageResult;
 
 /**
- * 系统管理员 Service 接口
+ * 管理员 Service 接口
+ * 继承泛型接口，添加 Admin 特有方法
  */
-public interface AdminService {
+public interface AdminService extends GenericService<Admin, AdminDto, AdminVo> {
 
-    void add(AdminDto dto);
+    boolean updateAdminNameFromAi(AdminDto dto);
 
-    void update(AdminDto dto);
+    void resetPassword(Long id);
 
-    void delete(Long id);
-
-    AdminVo getById(Long id);
-
-    PageResult<AdminVo> pageList(String keyword, Integer status, Integer pageNum, Integer pageSize);
-
-    void updateStatus(Long id, Integer status);
+    AdminVo getByUsername(String username);
 }

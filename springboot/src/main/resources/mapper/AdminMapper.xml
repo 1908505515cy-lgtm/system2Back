@@ -2,46 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.mapper.AdminMapper">
 
-    <!-- 新增 -->
-    <insert id="insert" parameterType="com.example.entity.Admin" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO sys_admin (
-            admin_code, username, password, real_name, avatar, gender,
-            mobile, email, status, dept_id, role_ids, remark
-        ) VALUES (
-                     #{adminCode}, #{username}, #{password}, #{realName}, #{avatar}, #{gender},
-                     #{mobile}, #{email}, #{status}, #{deptId}, #{roleIds}, #{remark}
-                 )
-    </insert>
-
-    <!-- 修改 -->
-    <update id="updateById" parameterType="com.example.entity.Admin">
-        UPDATE sys_admin
-        SET admin_code = #{adminCode},
-            username = #{username},
-            real_name = #{realName},
-            avatar = #{avatar},
-            gender = #{gender},
-            mobile = #{mobile},
-            email = #{email},
-            status = #{status},
-            dept_id = #{deptId},
-            role_ids = #{roleIds},
-            remark = #{remark},
-            update_time = NOW()
-        WHERE id = #{id} AND deleted = 0
-    </update>
-
-    <!-- 逻辑删除 -->
-    <update id="deleteById">
-        UPDATE sys_admin SET deleted = 1, update_time = NOW() WHERE id = #{id}
-    </update>
-
-    <!-- 查询详情 -->
-    <select id="selectById" resultType="com.example.entity.Admin">
-        SELECT * FROM sys_admin WHERE id = #{id} AND deleted = 0
-    </select>
-
-    <!-- 分页查询 -->
+    <!-- ==================== 分页查询 ==================== -->
     <select id="selectAdminPage" resultType="com.example.entity.Admin">
         SELECT * FROM sys_admin
         WHERE deleted = 0
@@ -57,7 +18,6 @@
         LIMIT #{offset}, #{pageSize}
     </select>
 
-    <!-- 查询总数 -->
     <select id="selectCount" resultType="long">
         SELECT COUNT(*) FROM sys_admin
         WHERE deleted = 0
@@ -71,13 +31,13 @@
         </if>
     </select>
 
-    <!-- 修改状态 -->
+    <!-- ==================== 修改状态 ==================== -->
     <update id="updateStatus">
         UPDATE sys_admin SET status = #{status}, update_time = NOW()
         WHERE id = #{id} AND deleted = 0
     </update>
 
-    <!-- 主动校验 -->
+    <!-- ==================== 唯一性校验 ==================== -->
     <select id="countByAdminCode" resultType="int">
         SELECT COUNT(*) FROM sys_admin WHERE admin_code = #{adminCode} AND deleted = 0
     </select>
@@ -92,6 +52,25 @@
 
     <select id="countByMobile" resultType="int">
         SELECT COUNT(*) FROM sys_admin WHERE mobile = #{mobile} AND deleted = 0
+    </select>
+
+    <!-- ==================== AI Agent 专用 ==================== -->
+    <update id="updateUserNameByAdminCode">
+        UPDATE sys_admin
+        SET username = #{userName},
+            update_time = NOW()
+        WHERE admin_code = #{adminCode} AND deleted = 0
+    </update>
+
+    <!-- ==================== 密码重置 ==================== -->
+    <update id="updatePassword">
+        UPDATE sys_admin SET password = #{password}, update_time = NOW()
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <!-- ==================== 登录查询 ==================== -->
+    <select id="selectByUsername" resultType="com.example.entity.Admin">
+        SELECT * FROM sys_admin WHERE username = #{username} AND deleted = 0
     </select>
 
 </mapper>
