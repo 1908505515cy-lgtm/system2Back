@@ -1,5 +1,7 @@
 # System2 - AI 驱动的通用管理平台
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 System2 是一个 AI 驱动的通用型管理平台，通过元数据驱动和 AI Agent 实现模块的动态注册与自然语言操作。
 
 ## 项目结构

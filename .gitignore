@@ -13,6 +13,8 @@ target/
 .settings/
 .project
 .classpath
+*.swp
+*.swo
 
 # Python
 __pycache__/
