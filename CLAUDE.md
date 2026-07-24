@@ -45,7 +45,7 @@ mvn package          # Build JAR
 
 ### Python AI (from `pythonAI/`)
 ```bash
-pip install -r requirements.txt   # fastapi, uvicorn, ollama, httpx, pydantic, python-dotenv
+pip install -r requirements.txt   # fastapi, uvicorn, ollama, httpx, pydantic, python-dotenv, chromadb
 python main.py                    # Start FastAPI with hot reload (port 8081)
 # Windows: start.bat              # Kill port 8081 and restart
 ```
@@ -54,7 +54,7 @@ python main.py                    # Start FastAPI with hot reload (port 8081)
 ```bash
 mysql -u root -p < sql/phase3_tables.sql   # Initialize schema
 ```
-Database name: `system2`
+Database name: `system2`. Flyway migrations (`V1__init.sql` through `V6__add_security_question.sql` in `springboot/src/main/resources/db/migration/`) run automatically on Spring Boot startup.
 
 ### Docker (from root)
 ```bash
@@ -139,9 +139,11 @@ The core design pattern is **metadata-driven generic CRUD**. New modules are cre
 - **API layer:** `utils/crudApi.ts` is a factory (`createCrudApi(base)`) that generates all CRUD methods (including recycle bin: trash, restore, permanentDelete, batchRestore, batchPermanentDelete) from an `apiBase` URL. Domain-specific typed APIs live in `api/manager/`.
 - **Auth:** JWT + refresh token stored in localStorage, injected via axios interceptor. On 401, the interceptor attempts token refresh via `/refresh` and queues failed requests during the refresh. On persistent failure, clears storage and redirects to `/login`. Route guards enforce module-level permissions: `user.modulePerms` from localStorage is checked against the `:module` route param; non-empty perms array blocks unauthorized modules.
 - **Path alias:** `@/*` maps to `./src/*`.
-- **Store:** Single Pinia store (`stores/user.ts`) for token/refreshToken/userInfo. No global module state.
+- **Store:** Pinia stores in `stores/`: `user.ts` (token/refreshToken/userInfo), `theme.ts`, `tab.ts`, `notification.ts`. No global module state.
 - **Theme:** SCSS customization via `unplugin-element-plus`, primary color `#5f56e7` in `assets/css/index.scss`.
 - **Lint/Format:** ESLint (`npm run lint`) and Prettier (`npm run format`) configured. Node engine: `^20.19.0 || >=22.12.0`.
+- **i18n:** Vue I18n with Chinese (`zh-CN`) and English (`en-US`) locales in `i18n/`.
+- **Workflow/Graph:** `@antv/x6` powers the workflow designer (`views/manager/WorkflowDesigner.vue` + `components/workflow/`).
 
 ## AI Integration Flow
 
@@ -178,10 +180,12 @@ The core design pattern is **metadata-driven generic CRUD**. New modules are cre
 
 ## Codebase Notes
 
-- **Mixed JS/TS:** Frontend is migrating toward TypeScript. API layers, types, and utils use `.ts`; core files (main.js, router) still `.js`.
+- **Mixed JS/TS:** Frontend is migrating toward TypeScript. API layers, types, stores, composables, and utils use `.ts`; entry point is `main.ts`. Config files (`vite.config.js`, `eslint.config.js`) remain `.js`.
 - **Inter-service auth:** Spring Boot and Python AI share a callback secret (`System2AiCallbackSecret2026` in application.yml and config.py).
 - **Logical delete:** All entities use `deleted` field (1/0), configured via MyBatis-Plus `@TableLogic`. Recycle bin endpoints (`/trash`, `/restore/{id}`, `/permanent-delete/{id}`) operate on logically deleted records.
 - **Entity inheritance:** `Account` is a base entity (no `@TableName` or `@ModuleMeta`) with shared fields (id, username, password, realName, avatar, gender, mobile, email, status, role, remark, timestamps, deleted, accountCode, lastLoginTime, lastLoginIp, loginCount). `Admin` extends it with `@SuperBuilder` and adds `adminCode`, `deptId`, `roleIds`. Use `@SuperBuilder` on both parent and child when extending entities. `ModuleRegistry` recursively scans parent classes for `@FieldMeta`.
 - **Module metadata endpoint:** `/module/list` and `/module/info/{name}` are excluded from login interceptor (publicly accessible for AI service startup and frontend module loading).
 - **Key libraries:** Hutool (backend utils), EasyExcel (import/export), Caffeine (token blacklist cache), ECharts (frontend charts).
 - **Python AI dispatch fast-paths:** Regex patterns intercept rename commands before LLM. Short messages without action keywords are routed directly to `chat` tool. LLM uses temperature 0.0 for tool selection, 0.7 for chat generation.
+- **RAG:** Python AI includes a ChromaDB-based RAG pipeline (`app/core/rag.py`) for knowledge base sync and retrieval.
+- **CI:** GitHub Actions (`.github/workflows/ci.yml`) runs on push to `main`/`dev`/`dev_cy` and PRs to `main`. Backend job: Java 21 (Temurin), `mvn compile` + `mvn test`. Frontend job: Node 22, `npm ci` + `npm run lint` + `npm run build`.
