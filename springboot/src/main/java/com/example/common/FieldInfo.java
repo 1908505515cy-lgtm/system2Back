@@ -52,4 +52,10 @@ public class FieldInfo {
 
     /** 字典类型编码（从字典表加载选项） */
     private String dictCode;
+
+    /** 关联模块名，用于外键展示 */
+    private String refModule;
+
+    /** 关联模块中用于展示的字段名 */
+    private String refField;
 }

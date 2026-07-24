@@ -34,4 +34,21 @@ public interface GenericService<E, D, V> {
 
     /** 按字段精确查询（供 AI 调用） */
     List<V> queryByFields(Map<String, Object> fields);
+
+    // ==================== 回收站功能 ====================
+
+    /** 查询回收站（已删除记录） */
+    PageResult<V> trash(String keyword, Integer pageNum, Integer pageSize);
+
+    /** 恢复已删除记录 */
+    void restore(Long id);
+
+    /** 彻底删除记录 */
+    void permanentDelete(Long id);
+
+    /** 批量恢复 */
+    void batchRestore(List<Long> ids);
+
+    /** 批量彻底删除 */
+    void batchPermanentDelete(List<Long> ids);
 }

@@ -5,7 +5,12 @@ import com.example.common.AiResult;
 import com.example.common.Result;
 import com.example.dto.AiActionDto;
 import com.example.service.AiDispatchService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 通用 AI 端点
@@ -15,10 +20,21 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/ai")
 public class AiController {
 
-    private final AiDispatchService aiDispatchService;
+    @Value("${python.agent.url}")
+    private String pythonAgentUrl;
 
-    public AiController(AiDispatchService aiDispatchService) {
+    @Value("${ollama.base-url:http://localhost:11434}")
+    private String ollamaBaseUrl;
+
+    @Value("${ollama.model:gemma4:latest}")
+    private String ollamaModel;
+
+    private final AiDispatchService aiDispatchService;
+    private final RestTemplate restTemplate;
+
+    public AiController(AiDispatchService aiDispatchService, RestTemplate restTemplate) {
         this.aiDispatchService = aiDispatchService;
+        this.restTemplate = restTemplate;
     }
 
     /**
@@ -60,5 +76,39 @@ public class AiController {
     @PostMapping("/confirm")
     public Result confirm(@RequestBody AiActionDto dto) {
         return execute(dto);
+    }
+
+    /**
+     * 检查 Ollama 服务状态
+     */
+    @GetMapping("/ollama-status")
+    public Result checkOllamaStatus() {
+        Map<String, Object> data = new HashMap<>();
+        try {
+            String url = ollamaBaseUrl + "/api/tags";
+            String response = restTemplate.getForObject(url, String.class);
+            data.put("connected", true);
+            data.put("model", ollamaModel);
+        } catch (Exception e) {
+            data.put("connected", false);
+            data.put("model", "");
+        }
+        return Result.success(data);
+    }
+
+    /**
+     * 检查 Python AI 服务状态
+     */
+    @GetMapping("/python-status")
+    public Result checkPythonStatus() {
+        Map<String, Object> data = new HashMap<>();
+        try {
+            String url = pythonAgentUrl.replace("/analyze", "/health");
+            String response = restTemplate.getForObject(url, String.class);
+            data.put("connected", true);
+        } catch (Exception e) {
+            data.put("connected", false);
+        }
+        return Result.success(data);
     }
 }

@@ -1,16 +1,20 @@
 import re
 import json
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from starlette.responses import StreamingResponse
 from app.schemas.analyzer import JavaInputRequest
 from app.core.llm_engine import get_gemma_agent_decision, chat_with_gemma_stream, chat_with_gemma
 from app.core.tool_registry import get_tool_by_name
 from app.core.java_client import execute_on_java, execute_on_java_async
+from app.core.auth import verify_api_key
 
 from app.api.Management.manager.handlers.analyze_handler import handle_analyze
 from app.api.Management.manager.handlers.chat_handler import handle_chat
 from app.api.Management.manager.handlers.update_name_handler import handle_update_name
+from app.api.Management.manager.handlers.chart_handler import handle_generate_chart
+from app.api.Management.manager.handlers.search_handler import handle_smart_search
+from app.api.Management.manager.handlers.knowledge_handler import handle_query_knowledge
 
 
 def _build_confirm_response(tool_name: str, description: str, params: dict) -> dict:
@@ -85,7 +89,7 @@ def fast_path_update_name(text: str) -> dict | None:
     return None
 
 
-def _dispatch_tool(tool_name: str, params: dict, raw_text: str) -> dict:
+def _dispatch_tool(tool_name: str, params: dict, raw_text: str, history: list = None) -> dict:
     """根据工具名分发到对应处理器"""
     tool = get_tool_by_name(tool_name) if tool_name else None
 
@@ -93,8 +97,17 @@ def _dispatch_tool(tool_name: str, params: dict, raw_text: str) -> dict:
         analysis_data = params.get("analysis_data") or params
         return handle_analyze(analysis_data)
 
+    elif tool_name == "generate_chart" or (tool and tool["action"] == "generate_chart"):
+        return handle_generate_chart(params)
+
+    elif tool_name == "smart_search" or (tool and tool["action"] == "smart_search"):
+        return handle_smart_search(params)
+
+    elif tool_name == "query_knowledge" or (tool and tool["action"] == "query_knowledge"):
+        return handle_query_knowledge(params, history)
+
     elif tool_name == "chat" or tool_name is None:
-        return handle_chat(raw_text)
+        return handle_chat(raw_text, history)
 
     elif tool_name == "query_entity":
         return _execute_query(params)
@@ -104,7 +117,7 @@ def _dispatch_tool(tool_name: str, params: dict, raw_text: str) -> dict:
         return _build_confirm_response(tool_name, description, params)
 
     else:
-        return handle_chat(raw_text)
+        return handle_chat(raw_text, history)
 
 
 def _execute_query(params: dict) -> dict:
@@ -143,8 +156,46 @@ def _build_description(tool_name: str, params: dict) -> str:
         return f"即将执行操作：{tool_name}，参数：{json.dumps(params, ensure_ascii=False)}"
 
 
+@router.get("/models")
+async def get_models(_auth: bool = Depends(verify_api_key)):
+    """返回当前模型配置"""
+    from app.core.config import settings
+    return {
+        "code": 200,
+        "data": {
+            "default": settings.OLLAMA_MODEL,
+            "tool": settings.tool_model,
+            "chat": settings.chat_model,
+            "baseUrl": settings.OLLAMA_BASE_URL,
+        }
+    }
+
+
+@router.post("/knowledge/sync")
+async def sync_knowledge(_auth: bool = Depends(verify_api_key)):
+    """同步知识库文档到向量数据库"""
+    from app.core.rag import sync_documents
+    result = sync_documents()
+    return {"code": 200, "data": result}
+
+
+@router.get("/knowledge/status")
+async def knowledge_status(_auth: bool = Depends(verify_api_key)):
+    """查询知识库状态"""
+    from app.core.rag import _get_collection
+    collection = _get_collection()
+    count = collection.count() if collection else 0
+    return {
+        "code": 200,
+        "data": {
+            "documentCount": count,
+            "available": collection is not None
+        }
+    }
+
+
 @router.post("/analyze")
-async def analyze_industry_data(payload: JavaInputRequest):
+async def analyze_industry_data(payload: JavaInputRequest, _: bool = Depends(verify_api_key)):
     try:
         raw_text = payload.raw_text.strip()
 
@@ -170,7 +221,8 @@ async def analyze_industry_data(payload: JavaInputRequest):
         return _dispatch_tool(tool_name, params, raw_text)
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("分析请求处理异常: %s", str(e))
+        raise HTTPException(status_code=500, detail="智能体处理异常")
 
 
 def _sse_event(data: dict) -> str:
@@ -178,8 +230,12 @@ def _sse_event(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def _stream_generator(raw_text: str):
+def _stream_generator(raw_text: str, history: list = None, industry_keyword: str = ""):
     """SSE 流式生成器（同步，FastAPI StreamingResponse 支持）"""
+    import time
+    last_heartbeat = time.time()
+    heartbeat_interval = 15  # 每 15 秒发送一次心跳
+
     try:
         # 快速路径1：正则匹配改名指令
         fast_result = fast_path_update_name(raw_text)
@@ -194,13 +250,17 @@ def _stream_generator(raw_text: str):
         # 快速路径2：明显闲聊
         if _is_obvious_chat(raw_text):
             yield _sse_event({"type": "start", "intent": "CHAT"})
-            for token in chat_with_gemma_stream(raw_text):
+            for token in chat_with_gemma_stream(raw_text, history):
                 yield _sse_event({"type": "token", "content": token})
+                current_time = time.time()
+                if current_time - last_heartbeat >= heartbeat_interval:
+                    yield ": heartbeat\n\n"
+                    last_heartbeat = current_time
             yield "data: [DONE]\n\n"
             return
 
         # 常规路径：LLM 工具选择
-        agent_result = get_gemma_agent_decision("", raw_text)
+        agent_result = get_gemma_agent_decision(industry_keyword, raw_text)
         tool_name = agent_result.get("tool")
         params = agent_result.get("params", {})
         logger.info("Stream LLM decision: tool=%s", tool_name)
@@ -212,8 +272,20 @@ def _stream_generator(raw_text: str):
             result = handle_analyze(analysis_data)
             yield _sse_event({"type": "json", "data": result})
 
+        elif tool_name == "generate_chart" or (tool and tool["action"] == "generate_chart"):
+            result = handle_generate_chart(params)
+            yield _sse_event({"type": "json", "data": result})
+
+        elif tool_name == "smart_search" or (tool and tool["action"] == "smart_search"):
+            result = handle_smart_search(params)
+            yield _sse_event({"type": "json", "data": result})
+
+        elif tool_name == "query_knowledge" or (tool and tool["action"] == "query_knowledge"):
+            result = handle_query_knowledge(params, history)
+            yield _sse_event({"type": "json", "data": result})
+
         elif tool_name == "query_entity":
-            result = asyncio.run(_execute_query(params))
+            result = _execute_query(params)
             yield _sse_event({"type": "json", "data": result})
 
         elif tool and tool.get("requires_confirm"):
@@ -223,26 +295,33 @@ def _stream_generator(raw_text: str):
 
         else:
             yield _sse_event({"type": "start", "intent": "CHAT"})
-            for token in chat_with_gemma_stream(raw_text):
+            for token in chat_with_gemma_stream(raw_text, history):
                 yield _sse_event({"type": "token", "content": token})
+                # 检查是否需要发送心跳
+                current_time = time.time()
+                if current_time - last_heartbeat >= heartbeat_interval:
+                    yield ": heartbeat\n\n"
+                    last_heartbeat = current_time
 
         yield "data: [DONE]\n\n"
 
     except Exception as e:
         logger.error("Stream error: %s", str(e))
-        yield _sse_event({"type": "error", "msg": f"智能体处理异常：{str(e)}"})
+        yield _sse_event({"type": "error", "msg": "智能体处理异常，请稍后再试"})
         yield "data: [DONE]\n\n"
 
 
 @router.post("/chat/stream")
-async def chat_stream(payload: JavaInputRequest):
+async def chat_stream(payload: JavaInputRequest, _: bool = Depends(verify_api_key)):
     """SSE 流式对话端点"""
     raw_text = (payload.raw_text or "").strip()
     if not raw_text:
         raise HTTPException(status_code=400, detail="raw_text 不能为空")
 
+    history = [item.model_dump() for item in (payload.history or [])]
+
     return StreamingResponse(
-        _stream_generator(raw_text),
+        _stream_generator(raw_text, history, payload.industry_keyword or ""),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -253,7 +332,7 @@ async def chat_stream(payload: JavaInputRequest):
 
 
 @router.post("/execute")
-async def execute_action(payload: dict):
+async def execute_action(payload: dict, _: bool = Depends(verify_api_key)):
     """确认执行端点：前端确认后调用"""
     tool_name = payload.get("tool")
     params = payload.get("params", {})

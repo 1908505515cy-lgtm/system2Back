@@ -75,6 +75,38 @@ TOOLS = [
         "example": "分析一下新能源汽车行业 → keyword='新能源汽车', text='...'"
     },
     {
+        "name": "generate_chart",
+        "description": "根据数据生成可视化图表。适用于用户要求画图、生成柱状图/饼图/折线图等。无需确认，直接返回 ECharts 配置。",
+        "action": "generate_chart",
+        "requires_confirm": False,
+        "params_schema": {
+            "chart_type": "str, 图表类型: bar/pie/line/radar",
+            "title": "str, 图表标题",
+            "data": "list, 数据列表，每项包含 name 和 value"
+        },
+        "example": "画一个部门人数饼图 → chart_type='pie', title='部门人数分布', data=[{\"name\":\"技术部\",\"value\":15}, ...]"
+    },
+    {
+        "name": "smart_search",
+        "description": "跨模块智能搜索。根据关键词在所有模块中搜索相关记录。无需确认。",
+        "action": "smart_search",
+        "requires_confirm": False,
+        "params_schema": {
+            "keyword": "str, 搜索关键词"
+        },
+        "example": "搜索张三 → keyword='张三'"
+    },
+    {
+        "name": "query_knowledge",
+        "description": "查询知识库。从知识库中检索相关文档来回答问题。适用于用户提问操作手册、常见问题、政策法规等。",
+        "action": "query_knowledge",
+        "requires_confirm": False,
+        "params_schema": {
+            "query": "str, 查询问题"
+        },
+        "example": "如何重置密码 → query='如何重置密码'"
+    },
+    {
         "name": "chat",
         "description": "自由对话、闲聊、提问。当用户的输入不属于任何工具操作时使用。",
         "action": "chat",
@@ -131,6 +163,10 @@ def get_output_format_examples() -> str:
         '{"tool": "delete_entity", "params": {"entity_type": "admin", "target_id": 5}}\n\n'
         '【格式：分析类】\n'
         '{"tool": "analyze_data", "params": {"keyword": "新能源汽车", "analysis_data": {...}}}\n\n'
+        '【格式：生成图表】\n'
+        '{"tool": "generate_chart", "params": {"chart_type": "pie", "title": "部门人数分布", "data": [{"name": "技术部", "value": 15}, {"name": "产品部", "value": 8}]}}\n\n'
+        '【格式：智能搜索】\n'
+        '{"tool": "smart_search", "params": {"keyword": "张三"}}\n\n'
         '【格式：闲聊/无法识别】\n'
         '{"tool": "chat", "params": {}}'
     )

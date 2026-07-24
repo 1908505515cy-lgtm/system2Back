@@ -1,6 +1,32 @@
+-- Phase 0: 管理员表
+CREATE TABLE IF NOT EXISTS sys_admin (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_code VARCHAR(50),
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(200) NOT NULL,
+    real_name VARCHAR(50),
+    avatar TEXT,
+    gender INT DEFAULT 0,
+    mobile VARCHAR(20),
+    email VARCHAR(100),
+    status INT DEFAULT 1,
+    last_login_time DATETIME,
+    last_login_ip VARCHAR(50),
+    login_count INT DEFAULT 0,
+    role VARCHAR(50),
+    admin_code VARCHAR(50) UNIQUE,
+    dept_id BIGINT,
+    role_ids VARCHAR(200),
+    remark VARCHAR(500),
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Phase 1: 部门表
 CREATE TABLE IF NOT EXISTS sys_department (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    parent_id BIGINT DEFAULT NULL COMMENT '上级部门ID',
     name VARCHAR(100) NOT NULL,
     dept_code VARCHAR(50) NOT NULL,
     leader VARCHAR(50),
@@ -9,7 +35,8 @@ CREATE TABLE IF NOT EXISTS sys_department (
     remark VARCHAR(500),
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted INT DEFAULT 0
+    deleted INT DEFAULT 0,
+    INDEX idx_parent_id (parent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Phase 3: 数据字典
@@ -63,6 +90,10 @@ CREATE TABLE IF NOT EXISTS sys_role (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 初始化数据
+-- 初始管理员：admin / admin123（BCrypt 加密）
+INSERT IGNORE INTO sys_admin (account_code, username, password, real_name, status, role, admin_code, dept_id, role_ids) VALUES
+('A001', 'admin', '$2b$12$vk.kL90UNrSqL7UU21yYeOLSRF84Z61Bp3cWbPdIJypHLGFfXCOjS', '超级管理员', 1, 'super_admin', 'ADMIN001', 1, '1');
+
 INSERT IGNORE INTO sys_department (name, dept_code, leader, status) VALUES
 ('技术部', 'TECH', '张三', 1),
 ('产品部', 'PRODUCT', '李四', 1),
@@ -82,3 +113,51 @@ INSERT IGNORE INTO sys_dict_data (dict_type_code, label, value, sort) VALUES
 ('sys_gender', '女', '2', 3),
 ('sys_status', '正常', '1', 1),
 ('sys_status', '禁用', '0', 2);
+
+-- AI对话会话
+CREATE TABLE IF NOT EXISTS chat_session (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200) NOT NULL DEFAULT '新对话',
+    user_id BIGINT,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- AI对话消息
+CREATE TABLE IF NOT EXISTS chat_message (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id BIGINT NOT NULL,
+    role VARCHAR(20) NOT NULL COMMENT 'user 或 ai',
+    content TEXT NOT NULL,
+    confirm_data TEXT COMMENT 'JSON格式的确认操作数据',
+    confirm_status VARCHAR(20) DEFAULT NULL COMMENT 'pending/confirmed/cancelled',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 系统通知
+CREATE TABLE IF NOT EXISTS sys_notification (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    content TEXT,
+    type VARCHAR(20) DEFAULT 'info' COMMENT 'info/warning/success',
+    target_user VARCHAR(50) COMMENT '目标用户名，null表示全员',
+    is_read INT DEFAULT 0,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 性能索引
+CREATE INDEX IF NOT EXISTS idx_admin_username ON sys_admin(username);
+CREATE INDEX IF NOT EXISTS idx_admin_status ON sys_admin(status);
+CREATE INDEX IF NOT EXISTS idx_admin_deleted ON sys_admin(deleted);
+CREATE INDEX IF NOT EXISTS idx_auditlog_operator ON sys_audit_log(operator);
+CREATE INDEX IF NOT EXISTS idx_auditlog_action ON sys_audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_auditlog_module ON sys_audit_log(module);
+CREATE INDEX IF NOT EXISTS idx_auditlog_time ON sys_audit_log(operate_time);
+CREATE INDEX IF NOT EXISTS idx_dictdata_type_code ON sys_dict_data(dict_type_code);
+CREATE INDEX IF NOT EXISTS idx_role_deleted ON sys_role(deleted);
+CREATE INDEX IF NOT EXISTS idx_dept_deleted ON sys_department(deleted);
+CREATE INDEX IF NOT EXISTS idx_chat_session_user ON chat_session(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_msg_session ON chat_message(session_id);

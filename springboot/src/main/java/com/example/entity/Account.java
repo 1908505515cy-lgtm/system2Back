@@ -65,6 +65,10 @@ public class Account {
     @FieldMeta(label = "备注", type = "textarea")
     private String remark;
 
+    private String securityQuestion;
+
+    private String securityAnswer;
+
     @FieldMeta(label = "创建时间", type = "date", showInForm = false)
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

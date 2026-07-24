@@ -29,6 +29,10 @@ public class Department {
     @FieldMeta(label = "ID", showInTable = false, showInForm = false)
     private Long id;
 
+    @FieldMeta(label = "上级部门", type = "treeSelect", showInTable = false,
+            dictCode = "department_tree", placeholder = "请选择上级部门")
+    private Long parentId;
+
     @FieldMeta(label = "部门名称", searchable = true, required = true, width = 150,
             placeholder = "请输入部门名称")
     private String name;

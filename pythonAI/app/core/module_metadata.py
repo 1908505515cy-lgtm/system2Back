@@ -65,6 +65,11 @@ def get_modules_description() -> str:
     return "\n".join(lines)
 
 
+def get_modules_list() -> list[dict]:
+    """返回已缓存的模块列表（原始数据）"""
+    return load_modules()
+
+
 def refresh_modules():
     """强制刷新模块缓存"""
     global _loaded

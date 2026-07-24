@@ -2,6 +2,7 @@ package com.example.service;
 
 import com.example.common.GenericService;
 import com.example.dto.AdminDto;
+import com.example.dto.RegisterDto;
 import com.example.entity.Admin;
 import com.example.vo.AdminVo;
 
@@ -15,5 +16,9 @@ public interface AdminService extends GenericService<Admin, AdminDto, AdminVo> {
 
     void resetPassword(Long id);
 
+    void changePassword(Long id, String oldPassword, String newPassword);
+
     AdminVo getByUsername(String username);
+
+    void register(RegisterDto dto);
 }

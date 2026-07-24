@@ -19,6 +19,9 @@ public enum ResultCodeEnum {
     USER_ACCOUNT_ERROR("5003", "账号或密码错误"),
     USER_NOT_EXIST_ERROR("5004", "用户不存在"),
     PARAM_PASSWORD_ERROR("5005", "原密码输入错误"),
+    PASSWORD_TOO_WEAK("5006", "密码强度不足，需至少8位且包含大写、小写、数字、特殊字符中的3种"),
+    ACCOUNT_LOCKED("5007", "账号已被锁定，请15分钟后再试"),
+    LOGIN_FAILED_LIMIT("5008", "登录失败次数过多，账号已被锁定15分钟"),
 
     // ==================== 管理员模块专用 ====================
     ADMIN_CODE_EXIST("A001", "管理员编码已存在"),

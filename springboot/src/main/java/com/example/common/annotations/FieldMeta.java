@@ -42,4 +42,10 @@ public @interface FieldMeta {
 
     /** 字典类型编码，从 sys_dict_data 表加载选项（优先级高于 options） */
     String dictCode() default "";
+
+    /** 关联模块名，用于外键展示（如 deptId 关联 department 模块） */
+    String refModule() default "";
+
+    /** 关联模块中用于展示的字段名（如 "name"），配合 refModule 使用 */
+    String refField() default "name";
 }

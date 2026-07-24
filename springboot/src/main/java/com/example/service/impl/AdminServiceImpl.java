@@ -1,9 +1,12 @@
 package com.example.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.common.GenericServiceImpl;
 import com.example.common.PageResult;
+import com.example.common.PasswordValidator;
 import com.example.dto.AdminDto;
+import com.example.dto.RegisterDto;
 import com.example.entity.Admin;
 import com.example.exception.CustomException;
 import com.example.mapper.AdminMapper;
@@ -12,6 +15,7 @@ import com.example.vo.AdminVo;
 import com.example.common.enums.ResultCodeEnum;
 import com.example.common.Constants;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,8 +31,8 @@ public class AdminServiceImpl extends GenericServiceImpl<Admin, AdminDto, AdminV
     private final AdminMapper adminMapper;
     private final PasswordEncoder passwordEncoder;
 
-    public AdminServiceImpl(AdminMapper adminMapper, PasswordEncoder passwordEncoder) {
-        super(adminMapper);
+    public AdminServiceImpl(AdminMapper adminMapper, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
+        super(adminMapper, jdbcTemplate);
         this.adminMapper = adminMapper;
         this.passwordEncoder = passwordEncoder;
     }
@@ -37,6 +41,10 @@ public class AdminServiceImpl extends GenericServiceImpl<Admin, AdminDto, AdminV
 
     @Override
     protected void beforeAdd(AdminDto dto) {
+        // 密码复杂度校验
+        if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
+            PasswordValidator.validate(dto.getPassword());
+        }
         if (dto.getAdminCode() != null && adminMapper.countByAdminCode(dto.getAdminCode()) > 0) {
             throw new CustomException(ResultCodeEnum.ADMIN_CODE_EXIST);
         }
@@ -113,6 +121,27 @@ public class AdminServiceImpl extends GenericServiceImpl<Admin, AdminDto, AdminV
         );
     }
 
+    @Override
+    protected void buildDataScopeCondition(QueryWrapper<Admin> wrapper, int dataScope,
+                                            Long currentUserId, Long currentDeptId) {
+        if (dataScope == 2 && currentDeptId != null) {
+            // 本部门数据
+            wrapper.eq("dept_id", currentDeptId);
+        } else if (dataScope == 3 && currentUserId != null) {
+            // 仅本人数据（管理员只能看到自己）
+            wrapper.eq("id", currentUserId);
+        }
+    }
+
+    @Override
+    protected void buildTrashKeywordCondition(StringBuilder whereClause, java.util.List<Object> params, String keyword) {
+        whereClause.append(" AND (username LIKE ? OR real_name LIKE ? OR admin_code LIKE ?)");
+        String pattern = "%" + keyword + "%";
+        params.add(pattern);
+        params.add(pattern);
+        params.add(pattern);
+    }
+
     // ==================== 覆写分页（使用自定义 XML 查询，避免泛型 QueryWrapper 问题） ====================
 
     @Override
@@ -138,9 +167,28 @@ public class AdminServiceImpl extends GenericServiceImpl<Admin, AdminDto, AdminV
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void resetPassword(Long id) {
-        String encoded = passwordEncoder.encode(Constants.USER_DEFAULT_PASSWORD);
+        String tempPassword = Constants.generateTempPassword();
+        String encoded = passwordEncoder.encode(tempPassword);
         if (adminMapper.updatePassword(id, encoded) == 0) {
             throw new CustomException(ResultCodeEnum.ADMIN_NOT_EXIST);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void changePassword(Long id, String oldPassword, String newPassword) {
+        Admin admin = adminMapper.selectById(id);
+        if (admin == null) {
+            throw new CustomException(ResultCodeEnum.ADMIN_NOT_EXIST);
+        }
+        if (!passwordEncoder.matches(oldPassword, admin.getPassword())) {
+            throw new CustomException(ResultCodeEnum.PARAM_PASSWORD_ERROR);
+        }
+        // 新密码复杂度校验
+        PasswordValidator.validate(newPassword);
+        String encoded = passwordEncoder.encode(newPassword);
+        if (adminMapper.updatePassword(id, encoded) == 0) {
+            throw new CustomException(ResultCodeEnum.SYSTEM_ERROR);
         }
     }
 
@@ -151,5 +199,34 @@ public class AdminServiceImpl extends GenericServiceImpl<Admin, AdminDto, AdminV
             return null;
         }
         return toVo(entity);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void register(RegisterDto dto) {
+        // 用户名唯一性
+        if (adminMapper.countByUsername(dto.getUsername()) > 0) {
+            throw new CustomException(ResultCodeEnum.ADMIN_USERNAME_EXIST);
+        }
+        // 邮箱唯一性
+        if (dto.getEmail() != null && !dto.getEmail().isEmpty()
+                && adminMapper.countByEmail(dto.getEmail()) > 0) {
+            throw new CustomException(ResultCodeEnum.ADMIN_EMAIL_EXIST);
+        }
+        // 密码复杂度校验
+        PasswordValidator.validate(dto.getPassword());
+
+        Admin admin = Admin.builder()
+                .username(dto.getUsername())
+                .password(passwordEncoder.encode(dto.getPassword()))
+                .realName(dto.getRealName())
+                .email(dto.getEmail())
+                .adminCode("U" + System.currentTimeMillis())
+                .status(1)
+                .roleIds("")
+                .securityQuestion(dto.getSecurityQuestion())
+                .securityAnswer(dto.getSecurityAnswer() != null ? passwordEncoder.encode(dto.getSecurityAnswer()) : null)
+                .build();
+        adminMapper.insert(admin);
     }
 }

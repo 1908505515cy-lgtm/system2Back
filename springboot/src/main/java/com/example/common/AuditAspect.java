@@ -9,6 +9,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -40,13 +41,25 @@ public class AuditAspect {
               "execution(* com.example.common.GenericController.updateField(..))")
     public void crudPointcut() {}
 
-    @Around("crudPointcut()")
+    @Pointcut("execution(* com.example.controller.AdminController.resetPassword(..)) || " +
+              "execution(* com.example.controller.AiController.confirmAiAction(..))")
+    public void adminCustomPointcut() {}
+
+    @Around("crudPointcut() || adminCustomPointcut()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
         String methodName = joinPoint.getSignature().getName();
         String action = mapAction(methodName);
         String module = extractModule(joinPoint);
         String operator = getOperator();
         String ip = getClientIp();
+
+        // 注入模块信息到 MDC，供日志输出
+        MDC.put("module", module);
+        try {
+            log.info("审计操作: operator={}, action={}, module={}, method={}", operator, action, module, methodName);
+        } finally {
+            MDC.remove("module");
+        }
 
         Object result = joinPoint.proceed();
 
@@ -67,6 +80,8 @@ public class AuditAspect {
             case "add" -> "create";
             case "update", "updateStatus", "updateField" -> "update";
             case "delete", "batchDelete" -> "delete";
+            case "resetPassword" -> "reset_password";
+            case "confirmAiAction" -> "ai_confirm";
             default -> methodName;
         };
     }
@@ -97,7 +112,10 @@ public class AuditAspect {
             HttpServletRequest request = getCurrentRequest();
             if (request != null) {
                 String ip = request.getHeader("X-Forwarded-For");
-                if (ip == null || ip.isEmpty()) {
+                if (ip != null && !ip.isEmpty()) {
+                    // 取第一个 IP（最接近客户端的代理）
+                    ip = ip.split(",")[0].trim();
+                } else {
                     ip = request.getRemoteAddr();
                 }
                 return ip;

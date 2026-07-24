@@ -38,18 +38,22 @@ def get_gemma_agent_decision(keyword: str, text: str) -> dict:
         f"{format_examples}"
     )
 
-    response = _ollama_client.chat(
-        model=settings.OLLAMA_MODEL,
-        messages=[
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'user', 'content': user_prompt}
-        ],
-        options={
-            'temperature': settings.MODEL_TEMPERATURE,
-            'num_ctx': settings.MODEL_NUM_CTX
-        },
-        format='json'
-    )
+    try:
+        response = _ollama_client.chat(
+            model=settings.tool_model,
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt}
+            ],
+            options={
+                'temperature': settings.MODEL_TEMPERATURE,
+                'num_ctx': settings.MODEL_NUM_CTX
+            },
+            format='json'
+        )
+    except Exception as e:
+        logger.error("Ollama 调用失败: %s", str(e))
+        return {"tool": "chat", "params": {}, "_llm_error": True}
 
     raw_content = response['message']['content'].strip()
     logger.info("Ollama response: %s", raw_content[:200])
@@ -108,53 +112,71 @@ def _convert_legacy_format(parsed: dict) -> dict:
         return {"tool": "chat", "params": {}}
 
 
-def chat_with_gemma(user_text: str) -> str:
-    """自由对话模式"""
-    response = _ollama_client.chat(
-        model=settings.OLLAMA_MODEL,
-        messages=[
-            {'role': 'system', 'content': (
-                '你是一个友好的 AI 助手，请用简洁清晰的中文回答用户的问题。\n'
-                '【格式要求】请使用 Markdown 格式组织回答：\n'
-                '- 用 ## 作为小标题分隔不同段落\n'
-                '- 用 **加粗** 强调关键信息\n'
-                '- 用 - 列出要点\n'
-                '- 段落之间用空行分隔\n'
-                '- 回答要精炼，避免冗长'
-            )},
-            {'role': 'user', 'content': user_text}
-        ],
-        options={
-            'temperature': 0.7,
-            'num_ctx': settings.MODEL_NUM_CTX
-        }
+def _build_chat_messages(user_text: str, history: list = None) -> list:
+    """构建带历史上下文的消息列表"""
+    # 尝试从知识库获取相关上下文
+    knowledge_context = ""
+    try:
+        from app.core.rag import get_knowledge_context
+        knowledge_context = get_knowledge_context(user_text)
+    except Exception:
+        pass
+
+    system_content = (
+        '你是一个友好的 AI 助手，请用简洁清晰的中文回答用户的问题。\n'
+        '【格式要求】请使用 Markdown 格式组织回答：\n'
+        '- 用 ## 作为小标题分隔不同段落\n'
+        '- 用 **加粗** 强调关键信息\n'
+        '- 用 - 列出要点\n'
+        '- 段落之间用空行分隔\n'
+        '- 回答要精炼，避免冗长'
     )
-    return response['message']['content'].strip()
+    if knowledge_context:
+        system_content += f'\n\n{knowledge_context}'
+
+    system_msg = {'role': 'system', 'content': system_content}
+    messages = [system_msg]
+    if history:
+        for item in history[-10:]:  # 最多保留最近10轮
+            role = 'assistant' if item.get('role') == 'ai' else 'user'
+            messages.append({'role': role, 'content': item.get('content', '')})
+    messages.append({'role': 'user', 'content': user_text})
+    return messages
 
 
-def chat_with_gemma_stream(user_text: str):
-    """流式对话模式"""
-    response = _ollama_client.chat(
-        model=settings.OLLAMA_MODEL,
-        messages=[
-            {'role': 'system', 'content': (
-                '你是一个友好的 AI 助手，请用简洁清晰的中文回答用户的问题。\n'
-                '【格式要求】请使用 Markdown 格式组织回答：\n'
-                '- 用 ## 作为小标题分隔不同段落\n'
-                '- 用 **加粗** 强调关键信息\n'
-                '- 用 - 列出要点\n'
-                '- 段落之间用空行分隔\n'
-                '- 回答要精炼，避免冗长'
-            )},
-            {'role': 'user', 'content': user_text}
-        ],
-        options={
-            'temperature': 0.7,
-            'num_ctx': settings.MODEL_NUM_CTX
-        },
-        stream=True
-    )
-    for chunk in response:
-        token = chunk['message']['content']
-        if token:
-            yield token
+def chat_with_gemma(user_text: str, history: list = None) -> str:
+    """自由对话模式（支持多轮上下文）"""
+    try:
+        response = _ollama_client.chat(
+            model=settings.chat_model,
+            messages=_build_chat_messages(user_text, history),
+            options={
+                'temperature': 0.7,
+                'num_ctx': settings.MODEL_NUM_CTX
+            }
+        )
+        return response['message']['content'].strip()
+    except Exception as e:
+        logger.error("Ollama 对话调用失败: %s", str(e))
+        return "AI 服务暂时不可用，请稍后再试。"
+
+
+def chat_with_gemma_stream(user_text: str, history: list = None):
+    """流式对话模式（支持多轮上下文）"""
+    try:
+        response = _ollama_client.chat(
+            model=settings.chat_model,
+            messages=_build_chat_messages(user_text, history),
+            options={
+                'temperature': 0.7,
+                'num_ctx': settings.MODEL_NUM_CTX
+            },
+            stream=True
+        )
+        for chunk in response:
+            token = chunk['message']['content']
+            if token:
+                yield token
+    except Exception as e:
+        logger.error("Ollama 流式调用失败: %s", str(e))
+        yield "\n\nAI 服务暂时不可用，请稍后再试。"

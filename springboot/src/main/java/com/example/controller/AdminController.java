@@ -81,4 +81,13 @@ public class AdminController extends GenericController<Admin, AdminDto, AdminVo>
         adminService.resetPassword(id);
         return Result.success("密码已重置");
     }
+
+    /**
+     * 修改密码
+     */
+    @PutMapping("/change-password")
+    public Result changePassword(@RequestBody AdminDto dto) {
+        adminService.changePassword(dto.getId(), dto.getOldPassword(), dto.getNewPassword());
+        return Result.success("密码修改成功");
+    }
 }

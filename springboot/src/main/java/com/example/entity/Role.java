@@ -41,6 +41,14 @@ public class Role {
             placeholder = "模块名用逗号分隔，如 admin,department")
     private String modulePerms;
 
+    @FieldMeta(label = "按钮权限", type = "textarea", showInTable = false,
+            placeholder = "如 admin:add,admin:delete,department:add")
+    private String buttonPerms;
+
+    @FieldMeta(label = "数据范围", type = "select", showInTable = false,
+            options = "全部数据:1,本部门数据:2,仅本人数据:3", placeholder = "请选择数据范围")
+    private Integer dataScope;
+
     @FieldMeta(label = "状态", type = "switch", width = 80,
             options = "正常:1,禁用:0")
     private Integer status;

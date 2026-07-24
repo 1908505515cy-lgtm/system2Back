@@ -18,6 +18,9 @@ public class JwtUtil {
     @Value("${jwt.expiration}")
     private long expiration;
 
+    // Refresh token 有效期 7 天
+    private static final long REFRESH_EXPIRATION = 7 * 24 * 60 * 60 * 1000L;
+
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
@@ -27,6 +30,16 @@ public class JwtUtil {
                 .subject(username)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String generateRefreshToken(String username) {
+        return Jwts.builder()
+                .subject(username)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + REFRESH_EXPIRATION))
+                .claim("type", "refresh")
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -51,6 +64,15 @@ public class JwtUtil {
             return exp.before(new Date());
         } catch (JwtException e) {
             return true;
+        }
+    }
+
+    public boolean isValid(String token) {
+        try {
+            Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token);
+            return true;
+        } catch (JwtException e) {
+            return false;
         }
     }
 }

@@ -7,11 +7,13 @@ public class CustomException extends RuntimeException {
     private String msg;
 
     public CustomException(String code, String msg) {
+        super(msg);
         this.code = code;
         this.msg = msg;
     }
 
     public CustomException(ResultCodeEnum resultCodeEnum) {
+        super(resultCodeEnum.getMsg());
         this.code = resultCodeEnum.getCode();
         this.msg = resultCodeEnum.getMsg();
     }

@@ -7,6 +7,7 @@ import com.example.entity.AuditLog;
 import com.example.exception.CustomException;
 import com.example.mapper.AuditLogMapper;
 import com.example.service.AuditLogService;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,8 +18,8 @@ public class AuditLogServiceImpl extends GenericServiceImpl<AuditLog, AuditLog, 
 
     private final AuditLogMapper auditLogMapper;
 
-    public AuditLogServiceImpl(AuditLogMapper mapper) {
-        super(mapper);
+    public AuditLogServiceImpl(AuditLogMapper mapper, JdbcTemplate jdbcTemplate) {
+        super(mapper, jdbcTemplate);
         this.auditLogMapper = mapper;
     }
 
@@ -29,6 +30,15 @@ public class AuditLogServiceImpl extends GenericServiceImpl<AuditLog, AuditLog, 
                 .or().like("module", keyword)
                 .or().like("action", keyword)
         );
+    }
+
+    @Override
+    protected void buildTrashKeywordCondition(StringBuilder whereClause, java.util.List<Object> params, String keyword) {
+        whereClause.append(" AND (operator LIKE ? OR module LIKE ? OR action LIKE ?)");
+        String pattern = "%" + keyword + "%";
+        params.add(pattern);
+        params.add(pattern);
+        params.add(pattern);
     }
 
     @Override

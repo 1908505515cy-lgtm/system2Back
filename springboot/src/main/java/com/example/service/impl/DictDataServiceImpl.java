@@ -6,6 +6,7 @@ import com.example.common.OptionItem;
 import com.example.entity.DictData;
 import com.example.mapper.DictDataMapper;
 import com.example.service.DictDataService;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,8 +18,8 @@ public class DictDataServiceImpl extends GenericServiceImpl<DictData, DictData, 
 
     private final DictDataMapper dictDataMapper;
 
-    public DictDataServiceImpl(DictDataMapper mapper) {
-        super(mapper);
+    public DictDataServiceImpl(DictDataMapper mapper, JdbcTemplate jdbcTemplate) {
+        super(mapper, jdbcTemplate);
         this.dictDataMapper = mapper;
     }
 
@@ -28,6 +29,14 @@ public class DictDataServiceImpl extends GenericServiceImpl<DictData, DictData, 
                 .like("label", keyword)
                 .or().like("dict_type_code", keyword)
         );
+    }
+
+    @Override
+    protected void buildTrashKeywordCondition(StringBuilder whereClause, java.util.List<Object> params, String keyword) {
+        whereClause.append(" AND (label LIKE ? OR dict_type_code LIKE ?)");
+        String pattern = "%" + keyword + "%";
+        params.add(pattern);
+        params.add(pattern);
     }
 
     @Override

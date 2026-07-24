@@ -1,0 +1,12 @@
+# 开发环境配置
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 开发环境密钥（必须通过环境变量设置，参考 .env.example）
+jwt:
+  secret: ${JWT_SECRET}
+
+ai:
+  callback:
+    secret: ${AI_CALLBACK_SECRET}

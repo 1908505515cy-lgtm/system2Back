@@ -107,6 +107,8 @@ public class ModuleRegistry implements InitializingBean {
                 info.setDisabledOnEdit(meta.disabledOnEdit());
                 info.setOptions(parseOptions(meta.options()));
                 info.setDictCode(meta.dictCode());
+                info.setRefModule(meta.refModule());
+                info.setRefField(meta.refField());
                 fields.add(info);
             }
             current = current.getSuperclass();

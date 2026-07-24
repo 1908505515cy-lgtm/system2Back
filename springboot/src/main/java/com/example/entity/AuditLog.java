@@ -31,8 +31,8 @@ public class AuditLog {
     @FieldMeta(label = "操作人", searchable = true, width = 100)
     private String operator;
 
-    @FieldMeta(label = "操作类型", width = 100,
-            options = "新增:create,修改:update,删除:delete")
+    @FieldMeta(label = "操作类型", type = "select", searchable = true, width = 100,
+            options = "新增:create,修改:update,删除:delete,重置密码:reset_password,AI确认:ai_confirm")
     private String action;
 
     @FieldMeta(label = "模块", searchable = true, width = 100)

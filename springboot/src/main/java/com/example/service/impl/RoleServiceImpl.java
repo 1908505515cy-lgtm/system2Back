@@ -5,6 +5,7 @@ import com.example.common.GenericServiceImpl;
 import com.example.entity.Role;
 import com.example.mapper.RoleMapper;
 import com.example.service.RoleService;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
@@ -17,8 +18,8 @@ public class RoleServiceImpl extends GenericServiceImpl<Role, Role, Role>
 
     private final RoleMapper roleMapper;
 
-    public RoleServiceImpl(RoleMapper mapper) {
-        super(mapper);
+    public RoleServiceImpl(RoleMapper mapper, JdbcTemplate jdbcTemplate) {
+        super(mapper, jdbcTemplate);
         this.roleMapper = mapper;
     }
 
@@ -28,6 +29,14 @@ public class RoleServiceImpl extends GenericServiceImpl<Role, Role, Role>
                 .like("name", keyword)
                 .or().like("code", keyword)
         );
+    }
+
+    @Override
+    protected void buildTrashKeywordCondition(StringBuilder whereClause, java.util.List<Object> params, String keyword) {
+        whereClause.append(" AND (name LIKE ? OR code LIKE ?)");
+        String pattern = "%" + keyword + "%";
+        params.add(pattern);
+        params.add(pattern);
     }
 
     @Override
@@ -42,6 +51,18 @@ public class RoleServiceImpl extends GenericServiceImpl<Role, Role, Role>
         return roles.stream()
                 .filter(r -> r.getModulePerms() != null && !r.getModulePerms().isEmpty())
                 .flatMap(r -> Arrays.stream(r.getModulePerms().split(",")))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<String> getUserButtonPerms(List<Long> roleIds) {
+        List<Role> roles = getByIds(roleIds);
+        return roles.stream()
+                .filter(r -> r.getButtonPerms() != null && !r.getButtonPerms().isEmpty())
+                .flatMap(r -> Arrays.stream(r.getButtonPerms().split(",")))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .distinct()
